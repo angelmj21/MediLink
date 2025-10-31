@@ -43,13 +43,13 @@ export function AppSidebar() {
         {/* Header */}
         <div className="p-4 border-b border-sidebar-border">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-sidebar-primary rounded-md flex items-center justify-center">
-              <span className="text-sidebar-primary-foreground font-bold text-sm">🩺</span>
+            <div className="w-10 h-10 bg-sidebar-primary rounded-md flex items-center justify-center">
+              <span className="text-sidebar-primary-foreground font-bold text-base">🩺</span>
             </div>
             {state !== "collapsed" && (
               <div>
-                <h2 className="font-semibold text-sidebar-foreground">HealthTracker</h2>
-                <p className="text-xs text-sidebar-foreground/70">Your Health Companion</p>
+                <h2 className="font-semibold text-sidebar-foreground text-xl">MediLink</h2>
+                <p className="text-sm text-sidebar-foreground/70">Your Health Companion</p>
               </div>
             )}
           </div>
@@ -64,8 +64,8 @@ export function AppSidebar() {
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
                     <NavLink to={item.url} end className={getNavCls}>
-                      <item.icon className="h-4 w-4" />
-                      {state !== "collapsed" && <span>{item.title}</span>}
+                      <item.icon className="h-5 w-5" />
+                      {state !== "collapsed" && <span className="text-base">{item.title}</span>}
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -83,8 +83,8 @@ export function AppSidebar() {
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
                     <NavLink to={item.url} className={getNavCls}>
-                      <item.icon className="h-4 w-4" />
-                      {state !== "collapsed" && <span>{item.title}</span>}
+                      <item.icon className="h-5 w-5" />
+                      {state !== "collapsed" && <span className="text-base">{item.title}</span>}
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

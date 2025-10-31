@@ -1,4 +1,6 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import { db } from "../firebase-Config"
+import { doc, getDoc, onSnapshot, setDoc } from "firebase/firestore"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -7,18 +9,22 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
-import { Plus, Pill, Clock, Bell, Calendar, AlertCircle } from "lucide-react"
+import { Plus, Pill, Clock, Bell, Calendar, AlertCircle, Trash2 } from "lucide-react"
 
 const Medications = () => {
   const [showAddDialog, setShowAddDialog] = useState(false)
 
-  const medications = [
+  const STORAGE_KEY = "medications_state"
+  const PROFILE_DOC = doc(db, "users", "demoUser")
+
+  const defaultMedications = [
     {
       id: 1,
       name: "Lisinopril",
       dosage: "10mg",
       frequency: "Once daily",
       time: "8:00 AM",
+      timeSlots: ["8:00 AM"],
       reminders: true,
       remaining: 25,
       refillDate: "2024-02-15",
@@ -30,6 +36,7 @@ const Medications = () => {
       dosage: "500mg",
       frequency: "Twice daily",
       time: "8:00 AM, 8:00 PM",
+      timeSlots: ["8:00 AM", "8:00 PM"],
       reminders: true,
       remaining: 45,
       refillDate: "2024-02-20",
@@ -41,6 +48,7 @@ const Medications = () => {
       dosage: "1000 IU",
       frequency: "Once daily",
       time: "8:00 AM",
+      timeSlots: ["8:00 AM"],
       reminders: true,
       remaining: 8,
       refillDate: "2024-01-25",
@@ -52,12 +60,179 @@ const Medications = () => {
       dosage: "81mg",
       frequency: "As needed",
       time: "When required",
+      timeSlots: [],
       reminders: false,
       remaining: 100,
       refillDate: "2024-03-01",
       status: "prn"
     }
   ]
+
+  const loadStored = () => {
+    try {
+      const raw = typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null
+      return raw ? JSON.parse(raw) : null
+    } catch {
+      return null
+    }
+  }
+
+  const stored = loadStored()
+  const [medications, setMedications] = useState(stored?.medications ?? defaultMedications)
+
+  // Persist to localStorage and Firestore on change
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ medications }))
+    } catch {}
+    // Firestore merge
+    try {
+      void setDoc(PROFILE_DOC, { medications }, { merge: true })
+    } catch {}
+  }, [medications])
+
+  // Load from Firestore on mount and listen for updates
+  useEffect(() => {
+    let unsub: undefined | (() => void)
+    const init = async () => {
+      try {
+        const snap = await getDoc(PROFILE_DOC)
+        if (snap.exists()) {
+          const data = snap.data() as { medications?: typeof defaultMedications }
+          if (Array.isArray(data.medications)) {
+            setMedications(data.medications)
+          }
+        }
+      } catch {}
+      unsub = onSnapshot(PROFILE_DOC, (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data() as { medications?: typeof defaultMedications }
+          if (Array.isArray(data.medications)) {
+            setMedications(data.medications)
+          }
+        }
+      })
+    }
+    void init()
+    return () => {
+      if (unsub) unsub()
+    }
+  }, [])
+
+  // Add Medication form state
+  const [medName, setMedName] = useState("")
+  const [dosage, setDosage] = useState("")
+  const [frequencyValue, setFrequencyValue] = useState<string | undefined>(undefined)
+  const [timeSlots, setTimeSlots] = useState<string[]>([])
+  const [reminders, setReminders] = useState(false)
+  const [remaining, setRemaining] = useState<number | "">("")
+  const [refillDate, setRefillDate] = useState("")
+
+  // Edit state
+  const [isEditing, setIsEditing] = useState(false)
+  const [editingId, setEditingId] = useState<number | null>(null)
+
+  const frequencyLabelFromValue = (val?: string) => {
+    switch (val) {
+      case "once": return "Once daily"
+      case "twice": return "Twice daily"
+      case "three": return "Three times daily"
+      case "four": return "Four times daily"
+      case "asneeded": return "As needed"
+      default: return "As needed"
+    }
+  }
+
+  const computeStatus = (rem: number, freqVal?: string) => {
+    if (freqVal === "asneeded") return "prn"
+    if (rem <= 10) return "low"
+    return "active"
+  }
+
+  const resetForm = () => {
+    setMedName("")
+    setDosage("")
+    setFrequencyValue(undefined)
+    setTimeSlots([])
+    setReminders(false)
+    setRemaining("")
+    setRefillDate("")
+    setIsEditing(false)
+    setEditingId(null)
+  }
+
+  const handleAddMedication = () => {
+    if (!medName.trim()) return
+    const remNum = typeof remaining === "number" ? remaining : parseInt(String(remaining || "0"), 10) || 0
+    const freqLabel = frequencyLabelFromValue(frequencyValue)
+    const slots = frequencyValue === "asneeded"
+      ? []
+      : (timeSlots.length > 0 ? timeSlots.map(s => s.trim()).filter(Boolean) : ["8:00 AM"]) 
+
+    if (isEditing && editingId !== null) {
+      setMedications(prev => prev.map(m => m.id === editingId ? {
+        ...m,
+        name: medName.trim(),
+        dosage: dosage.trim() || "As directed",
+        frequency: freqLabel,
+        time: slots.length ? slots.join(", ") : "When required",
+        timeSlots: slots,
+        reminders,
+        remaining: remNum,
+        refillDate: refillDate || new Date().toISOString(),
+        status: computeStatus(remNum, frequencyValue),
+      } : m))
+    } else {
+      const newMed = {
+        id: Date.now(),
+        name: medName.trim(),
+        dosage: dosage.trim() || "As directed",
+        frequency: freqLabel,
+        time: slots.length ? slots.join(", ") : "When required",
+        timeSlots: slots,
+        reminders,
+        remaining: remNum,
+        refillDate: refillDate || new Date().toISOString(),
+        status: computeStatus(remNum, frequencyValue),
+      }
+      setMedications(prev => [newMed, ...prev])
+    }
+    resetForm()
+    setShowAddDialog(false)
+  }
+
+  const prepareEdit = (med: any) => {
+    setIsEditing(true)
+    setEditingId(med.id)
+    setMedName(med.name)
+    setDosage(med.dosage)
+    const freqVal = (() => {
+      switch ((med.frequency || '').toLowerCase()) {
+        case 'once daily': return 'once'
+        case 'twice daily': return 'twice'
+        case 'three times daily': return 'three'
+        case 'four times daily': return 'four'
+        case 'as needed': return 'asneeded'
+        default: return undefined
+      }
+    })()
+    setFrequencyValue(freqVal)
+    if (Array.isArray(med.timeSlots)) setTimeSlots(med.timeSlots)
+    else if (typeof med.time === 'string') setTimeSlots(med.time.split(',').map((s: string) => s.trim()).filter(Boolean))
+    else setTimeSlots([])
+    setReminders(!!med.reminders)
+    setRemaining(med.remaining ?? "")
+    setRefillDate((med.refillDate || "").slice(0,10))
+    setShowAddDialog(true)
+  }
+
+  const handleDeleteMedication = (id: number) => {
+    const target = medications.find(m => m.id === id)
+    if (!target) return
+    const ok = window.confirm(`Delete ${target.name}? This action cannot be undone.`)
+    if (!ok) return
+    setMedications(prev => prev.filter(m => m.id !== id))
+  }
 
   const todaySchedule = [
     { name: "Lisinopril", time: "8:00 AM", taken: true },
@@ -106,16 +281,16 @@ const Medications = () => {
             <div className="space-y-4">
               <div>
                 <Label htmlFor="medName">Medication Name</Label>
-                <Input id="medName" placeholder="Enter medication name" />
+                <Input id="medName" placeholder="Enter medication name" value={medName} onChange={(e) => setMedName(e.target.value)} />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="dosage">Dosage</Label>
-                  <Input id="dosage" placeholder="e.g., 10mg" />
+                  <Input id="dosage" placeholder="e.g., 10mg" value={dosage} onChange={(e) => setDosage(e.target.value)} />
                 </div>
                 <div>
                   <Label htmlFor="frequency">Frequency</Label>
-                  <Select>
+                  <Select value={frequencyValue} onValueChange={setFrequencyValue}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select frequency" />
                     </SelectTrigger>
@@ -131,14 +306,41 @@ const Medications = () => {
               </div>
               <div>
                 <Label htmlFor="time">Reminder Time(s)</Label>
-                <Input id="time" placeholder="e.g., 8:00 AM" />
+                {frequencyValue && frequencyValue !== 'asneeded' ? (
+                  <div className="space-y-2">
+                    {Array.from({ length: frequencyValue === 'once' ? 1 : frequencyValue === 'twice' ? 2 : frequencyValue === 'three' ? 3 : 4 }).map((_, idx) => (
+                      <Input
+                        key={idx}
+                        placeholder={`e.g., ${idx === 0 ? '8:00 AM' : idx === 1 ? '8:00 PM' : '12:00 PM'}`}
+                        value={timeSlots[idx] || ''}
+                        onChange={(e) => {
+                          const next = [...timeSlots]
+                          next[idx] = e.target.value
+                          setTimeSlots(next)
+                        }}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <Input id="time" placeholder="When required" disabled />
+                )}
               </div>
               <div className="flex items-center space-x-2">
-                <Switch id="reminders" />
+                <Switch id="reminders" checked={reminders} onCheckedChange={setReminders} />
                 <Label htmlFor="reminders">Enable push notifications</Label>
               </div>
-              <Button className="w-full" onClick={() => setShowAddDialog(false)}>
-                Add Medication
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="remaining">Pills Remaining</Label>
+                  <Input id="remaining" type="number" placeholder="e.g., 30" value={remaining} onChange={(e) => setRemaining(e.target.value === "" ? "" : Number(e.target.value))} />
+                </div>
+                <div>
+                  <Label htmlFor="refill">Refill Date</Label>
+                  <Input id="refill" type="date" value={refillDate} onChange={(e) => setRefillDate(e.target.value)} />
+                </div>
+              </div>
+              <Button className="w-full" onClick={handleAddMedication}>
+                {isEditing ? 'Save Changes' : 'Add Medication'}
               </Button>
             </div>
           </DialogContent>
@@ -200,7 +402,7 @@ const Medications = () => {
                     </div>
                     <div className="flex items-center gap-2 text-sm">
                       <Clock className="h-3 w-3" />
-                      <span>{med.time}</span>
+                      <span>{Array.isArray(med.timeSlots) ? med.timeSlots.join(', ') : (typeof med.time === 'string' ? med.time : '')}</span>
                       {med.reminders && <Bell className="h-3 w-3 text-primary" />}
                     </div>
                   </div>
@@ -214,6 +416,12 @@ const Medications = () => {
                     <p className="text-xs text-muted-foreground">
                       Refill: {new Date(med.refillDate).toLocaleDateString()}
                     </p>
+                    <div className="pt-1 flex gap-2 justify-end">
+                      <Button variant="outline" size="sm" onClick={() => prepareEdit(med)}>Edit</Button>
+                      <Button variant="destructive" size="sm" onClick={() => handleDeleteMedication(med.id)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
               ))}

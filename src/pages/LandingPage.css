@@ -1,0 +1,40 @@
+/* LandingPage.css */
+
+/* Scoped variables */
+.landing {
+  --background: 151 20% 92%; /* Pale Green */
+  --foreground: 0 0% 20%;
+  --card: 0 0% 100%;
+  --card-foreground: 0 0% 20%;
+  --primary: 151 76% 42%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 151 45% 47%;
+  --secondary-foreground: 0 0% 100%;
+  --accent: 151 55% 60%;
+  --accent-foreground: 0 0% 100%;
+  --muted: 151 20% 88%;
+  --muted-foreground: 0 0% 45%;
+  --radius: 0.75rem;
+}
+
+/* Dark mode just for landing */
+.landing.dark {
+  --background: 151 30% 8%;
+  --foreground: 0 0% 95%;
+  --card: 151 25% 12%;
+  --card-foreground: 0 0% 95%;
+  --primary: 151 76% 42%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 151 30% 20%;
+  --secondary-foreground: 0 0% 95%;
+  --accent: 151 35% 25%;
+  --accent-foreground: 0 0% 95%;
+  --muted: 151 25% 15%;
+  --muted-foreground: 0 0% 70%;
+  --radius: 0.75rem;
+}
+
+/* Apply styles within scope */
+.landing {
+  @apply bg-[hsl(var(--background))] text-[hsl(var(--foreground))] min-h-screen;
+}

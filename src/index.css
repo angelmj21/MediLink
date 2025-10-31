@@ -2,32 +2,26 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
-
+/* Design system with all colors in HSL */
 @layer base {
   :root {
     /* Green Health Theme */
-    --background: 151 20% 92%; /* Pale Green background */
-    --foreground: 0 0% 20%; /* Payne's Gray text */
+    --background: 151 20% 92%;
+    --foreground: 0 0% 20%;
 
-    --card: 0 0% 100%; /* White cards */
+    --card: 0 0% 100%;
     --card-foreground: 0 0% 20%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 20%;
-
-    --primary: 151 76% 42%; /* Teal Accent for CTAs */
+    --primary: 151 76% 42%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 151 45% 47%; /* Mid Green for sections */
+    --secondary: 151 45% 47%;
     --secondary-foreground: 0 0% 100%;
 
-    --muted: 151 20% 88%; /* Light muted green */
+    --muted: 151 20% 88%;
     --muted-foreground: 0 0% 45%;
 
-    --accent: 151 55% 60%; /* Light Green for buttons */
+    --accent: 151 55% 60%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84.2% 60.2%;
@@ -39,26 +33,24 @@ All colors MUST be HSL.
 
     --radius: 0.75rem;
 
-    /* Sidebar - Dark Green */
-    --sidebar-background: 151 68% 23%; /* Dark Green */
+    --sidebar-background: 151 68% 23%;
     --sidebar-foreground: 0 0% 95%;
-    --sidebar-primary: 151 76% 42%; /* Teal highlights */
+    --sidebar-primary: 151 76% 42%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 151 65% 30%; /* Slightly lighter for hover */
+    --sidebar-accent: 151 65% 30%;
     --sidebar-accent-foreground: 0 0% 100%;
     --sidebar-border: 151 65% 30%;
     --sidebar-ring: 151 76% 42%;
 
-    /* Health-specific colors */
-    --health-primary: 151 68% 23%; /* Dark Green */
-    --health-secondary: 151 45% 47%; /* Mid Green */
-    --health-accent: 151 55% 60%; /* Light Green */
-    --health-cta: 151 76% 42%; /* Teal Accent */
-    --health-bg: 151 20% 92%; /* Pale Green */
+    --health-primary: 151 68% 23%;
+    --health-secondary: 151 45% 47%;
+    --health-accent: 151 55% 60%;
+    --health-cta: 151 76% 42%;
+    --health-bg: 151 20% 92%;
   }
 
   .dark {
-    /* Dark mode green theme */
+    /* Dark mode theme */
     --background: 151 30% 8%;
     --foreground: 0 0% 95%;
 
@@ -96,7 +88,6 @@ All colors MUST be HSL.
     --sidebar-border: 151 65% 30%;
     --sidebar-ring: 151 76% 42%;
 
-    /* Dark mode health colors */
     --health-primary: 151 68% 23%;
     --health-secondary: 151 45% 35%;
     --health-accent: 151 55% 45%;
@@ -111,6 +102,22 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans;
+  }
+
+  input, button, select, textarea {
+    @apply rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-green-500;
+  }
+
+  a {
+    @apply text-primary hover:underline;
+  }
+
+  /* Ensure Google Map container fills parent */
+  #root, html, body {
+    height: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 0;
   }
 }

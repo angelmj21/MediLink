@@ -11,6 +11,7 @@ import Clinics from "./pages/Clinics";
 import Analytics from "./pages/Analytics";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
+import LandingPage from "./pages/LandingPage";   // ✅ Landing Page
 
 const queryClient = new QueryClient();
 
@@ -20,18 +21,28 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Layout>
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/history" element={<MedicalHistory />} />
-            <Route path="/medications" element={<Medications />} />
-            <Route path="/clinics" element={<Clinics />} />
-            <Route path="/analytics" element={<Analytics />} />
-            <Route path="/profile" element={<Profile />} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </Layout>
+        <Routes>
+          {/* ✅ Landing Page at root - no Layout */}
+          <Route path="/" element={<LandingPage />} />
+
+          {/* ✅ Protected pages inside Layout */}
+          <Route
+            path="/*"
+            element={
+              <Layout>
+                <Routes>
+                  <Route path="dashboard" element={<Dashboard />} />
+                  <Route path="history" element={<MedicalHistory />} />
+                  <Route path="medications" element={<Medications />} />
+                  <Route path="clinics" element={<Clinics />} />
+                  <Route path="analytics" element={<Analytics />} />
+                  <Route path="profile" element={<Profile />} />
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </Layout>
+            }
+          />
+        </Routes>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

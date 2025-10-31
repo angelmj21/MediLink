@@ -1,183 +1,188 @@
-import { useState } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+import React, { useEffect, useState } from "react"
+import { GoogleMap, Marker, InfoWindow, useJsApiLoader } from "@react-google-maps/api"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { MapPin, Phone, Clock, Star, Heart, Eye, Brain, Navigation } from "lucide-react"
+import { MapPin, Star } from "lucide-react"
+
+interface Clinic {
+  id: number
+  lat: number
+  lng: number
+  name: string
+  specialty?: string
+  distance?: string
+  rating?: number
+  emergency?: boolean
+}
+
+const containerStyle = {
+  width: "100%",
+  height: "400px",
+  borderRadius: "0.75rem",
+}
 
 const Clinics = () => {
-  const [searchTerm, setSearchTerm] = useState("")
-  const [selectedSpecialty, setSelectedSpecialty] = useState("all")
-
-  const clinics = [
-    {
-      id: 1,
-      name: "Central Medical Center",
-      specialty: "General Practice",
-      address: "123 Main Street, Downtown",
-      distance: "0.5 miles",
-      rating: 4.8,
-      phone: "(555) 123-4567",
-      hours: "Mon-Fri: 8AM-6PM",
-      icon: Heart,
-      emergency: true,
-      favorite: true
-    },
-    {
-      id: 2,
-      name: "Cardiology Specialists",
-      specialty: "Cardiology",
-      address: "456 Health Avenue, Medical District",
-      distance: "1.2 miles",
-      rating: 4.9,
-      phone: "(555) 234-5678",
-      hours: "Mon-Fri: 7AM-5PM",
-      icon: Heart,
-      emergency: false,
-      favorite: false
-    },
-    {
-      id: 3,
-      name: "Vision Care Center",
-      specialty: "Ophthalmology",
-      address: "789 Eye Street, Vision Plaza",
-      distance: "2.1 miles",
-      rating: 4.7,
-      phone: "(555) 345-6789",
-      hours: "Mon-Sat: 9AM-7PM",
-      icon: Eye,
-      emergency: false,
-      favorite: true
-    },
-    {
-      id: 4,
-      name: "Mental Health Clinic",
-      specialty: "Psychiatry",
-      address: "321 Wellness Drive, Health Park",
-      distance: "1.8 miles",
-      rating: 4.6,
-      phone: "(555) 456-7890",
-      hours: "Mon-Fri: 8AM-8PM",
-      icon: Brain,
-      emergency: false,
-      favorite: false
-    },
-    {
-      id: 5,
-      name: "Emergency Medical Center",
-      specialty: "Emergency Medicine",
-      address: "999 Emergency Blvd, Hospital District",
-      distance: "0.8 miles",
-      rating: 4.5,
-      phone: "(555) 911-0000",
-      hours: "24/7",
-      icon: Heart,
-      emergency: true,
-      favorite: false
-    }
-  ]
-
-  const specialties = [
-    { value: "all", label: "All Specialties" },
-    { value: "general", label: "General Practice" },
-    { value: "cardiology", label: "Cardiology" },
-    { value: "ophthalmology", label: "Ophthalmology" },
-    { value: "psychiatry", label: "Psychiatry" },
-    { value: "emergency", label: "Emergency Medicine" },
-  ]
-
-  const filteredClinics = clinics.filter(clinic => {
-    const matchesSearch = clinic.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         clinic.specialty.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         clinic.address.toLowerCase().includes(searchTerm.toLowerCase())
-    
-    const matchesSpecialty = selectedSpecialty === "all" || 
-                            clinic.specialty.toLowerCase().includes(selectedSpecialty.toLowerCase())
-    
-    return matchesSearch && matchesSpecialty
+  const { isLoaded } = useJsApiLoader({
+    googleMapsApiKey: "AIzaSyBDY1DjkL2vKsOrpSVWioLCw94aQdj22j4",
+    libraries: ["places"],
   })
+
+  const [userPosition, setUserPosition] = useState<{ lat: number; lng: number } | null>(null)
+  const [clinics, setClinics] = useState<Clinic[]>([])
+  const [filteredClinics, setFilteredClinics] = useState<Clinic[]>([])
+  const [selectedClinic, setSelectedClinic] = useState<Clinic | null>(null)
+  const [showUserInfo, setShowUserInfo] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
+
+  // Get user location
+  useEffect(() => {
+    const fetchIpLocation = () => {
+      fetch("https://ipapi.co/json/")
+        .then((res) => res.json())
+        .then((data) => {
+          setUserPosition({ lat: data.latitude, lng: data.longitude })
+        })
+    }
+
+    if (!navigator.geolocation) {
+      fetchIpLocation()
+      return
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setUserPosition({ lat: pos.coords.latitude, lng: pos.coords.longitude })
+      },
+      () => fetchIpLocation(),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+    )
+  }, [])
+
+  // Fetch nearby clinics
+  useEffect(() => {
+    if (!userPosition) return
+    const { lat, lng } = userPosition
+    const overpassQuery = `
+      [out:json];
+      (
+        node["amenity"="clinic"](around:5000,${lat},${lng});
+        node["amenity"="hospital"](around:5000,${lat},${lng});
+      );
+      out;
+    `
+    fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(overpassQuery)}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (!data.elements) return
+        const clinicsData: Clinic[] = data.elements.map((el: any, i: number) => ({
+          id: el.id || i,
+          lat: el.lat,
+          lng: el.lon,
+          name: el.tags?.name || "Unnamed Clinic",
+          specialty: el.tags?.specialty || "General Practice",
+          rating: +(Math.random() * 2 + 3).toFixed(1),
+          distance: `${(Math.random() * 5 + 0.2).toFixed(1)} km`,
+          emergency: Math.random() > 0.7,
+        }))
+        setClinics(clinicsData.slice(0, 10))
+        setFilteredClinics(clinicsData.slice(0, 10))
+      })
+      .catch((e) => console.error("Failed to fetch clinics:", e))
+  }, [userPosition])
+
+  // Filter clinics by search query
+  useEffect(() => {
+    if (!searchQuery) {
+      setFilteredClinics(clinics)
+    } else {
+      setFilteredClinics(
+        clinics.filter((c) =>
+          c.name.toLowerCase().includes(searchQuery.toLowerCase())
+        )
+      )
+    }
+  }, [searchQuery, clinics])
+
+  if (!isLoaded || !userPosition) return <p>Loading map and location...</p>
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold">Find Clinics</h1>
-          <p className="text-muted-foreground">Locate nearby healthcare providers and book appointments</p>
-        </div>
-        <Button className="gap-2">
-          <Navigation className="h-4 w-4" />
-          Get Directions
-        </Button>
-      </div>
+      {/* Search bar */}
+      <input
+        type="text"
+        placeholder="Search clinics..."
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        className="w-full p-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary"
+      />
 
-      {/* Search and Filters */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
-              <Input
-                placeholder="Search by clinic name, specialty, or location..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full"
-              />
-            </div>
-            <div className="md:w-64">
-              <Select value={selectedSpecialty} onValueChange={setSelectedSpecialty}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select specialty" />
-                </SelectTrigger>
-                <SelectContent>
-                  {specialties.map((specialty) => (
-                    <SelectItem key={specialty.value} value={specialty.value}>
-                      {specialty.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Map Placeholder */}
+      {/* Map */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <MapPin className="h-5 w-5 text-primary" />
-            Nearby Clinics
+            <MapPin className="h-5 w-5 text-primary" /> Nearby Clinics
           </CardTitle>
-          <CardDescription>Interactive map showing clinic locations</CardDescription>
+          <CardDescription>Showing your location and nearby clinics</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="h-64 bg-muted rounded-lg flex items-center justify-center">
-            <div className="text-center space-y-2">
-              <MapPin className="h-12 w-12 text-muted-foreground mx-auto" />
-              <p className="text-muted-foreground">Interactive map would be displayed here</p>
-              <p className="text-sm text-muted-foreground">Showing {filteredClinics.length} clinics near you</p>
-            </div>
-          </div>
+          <GoogleMap mapContainerStyle={containerStyle} center={userPosition} zoom={14}>
+            {/* User marker */}
+            <Marker
+              position={userPosition}
+              icon={{ url: "http://maps.google.com/mapfiles/ms/icons/red-dot.png" }}
+              onClick={() => setShowUserInfo(true)}
+            />
+            {showUserInfo && (
+              <InfoWindow position={userPosition} onCloseClick={() => setShowUserInfo(false)}>
+                <div>You are here</div>
+              </InfoWindow>
+            )}
+
+            {/* Filtered clinic markers */}
+            {filteredClinics.map((clinic) => (
+              <Marker
+                key={clinic.id}
+                position={{ lat: clinic.lat, lng: clinic.lng }}
+                icon={{ url: "http://maps.google.com/mapfiles/ms/icons/blue-dot.png" }}
+                onClick={() => setSelectedClinic(clinic)}
+              />
+            ))}
+
+            {selectedClinic && (
+              <InfoWindow
+                position={{ lat: selectedClinic.lat, lng: selectedClinic.lng }}
+                onCloseClick={() => setSelectedClinic(null)}
+              >
+                <div>
+                  <h3>{selectedClinic.name}</h3>
+                  {selectedClinic.specialty && <p>{selectedClinic.specialty}</p>}
+                  {/* Get Directions button */}
+                  <a
+                    href={`https://www.google.com/maps/dir/?api=1&origin=${userPosition.lat},${userPosition.lng}&destination=${selectedClinic.lat},${selectedClinic.lng}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-block mt-2 px-3 py-1 bg-primary text-white rounded-md hover:bg-primary/90"
+                  >
+                    Get Directions
+                  </a>
+                </div>
+              </InfoWindow>
+            )}
+          </GoogleMap>
         </CardContent>
       </Card>
 
-      {/* Clinic List */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Clinic list */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {filteredClinics.map((clinic) => (
           <Card key={clinic.id} className="hover:shadow-md transition-shadow">
             <CardHeader>
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-primary/10 rounded-lg">
-                    <clinic.icon className="h-6 w-6 text-primary" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-lg">{clinic.name}</CardTitle>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Badge variant="secondary">{clinic.specialty}</Badge>
-                      {clinic.emergency && <Badge variant="destructive">Emergency</Badge>}
-                      {clinic.favorite && <Badge variant="outline">⭐ Favorite</Badge>}
-                    </div>
+              <div className="flex justify-between items-start">
+                <div>
+                  <CardTitle className="text-lg">{clinic.name}</CardTitle>
+                  <div className="flex items-center gap-2 mt-1">
+                    {clinic.specialty && <Badge variant="secondary">{clinic.specialty}</Badge>}
+                    {clinic.emergency && <Badge variant="destructive">Emergency</Badge>}
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
@@ -185,49 +190,13 @@ const Clinics = () => {
                   <span className="text-sm font-medium">{clinic.rating}</span>
                 </div>
               </div>
+              <p className="text-sm text-muted-foreground mt-1">
+                <MapPin className="inline h-4 w-4 mr-1" /> {clinic.distance}
+              </p>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <MapPin className="h-4 w-4" />
-                  <span>{clinic.address}</span>
-                  <span className="text-primary font-medium">• {clinic.distance}</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Phone className="h-4 w-4" />
-                  <span>{clinic.phone}</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Clock className="h-4 w-4" />
-                  <span>{clinic.hours}</span>
-                </div>
-              </div>
-              
-              <div className="flex gap-2">
-                <Button className="flex-1">Book Appointment</Button>
-                <Button variant="outline" size="icon">
-                  <Phone className="h-4 w-4" />
-                </Button>
-                <Button variant="outline" size="icon">
-                  <Navigation className="h-4 w-4" />
-                </Button>
-              </div>
-            </CardContent>
           </Card>
         ))}
       </div>
-
-      {filteredClinics.length === 0 && (
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-center py-8">
-              <MapPin className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-medium mb-2">No clinics found</h3>
-              <p className="text-muted-foreground">Try adjusting your search criteria or location.</p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </div>
   )
 }
